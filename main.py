@@ -258,15 +258,22 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
             return
 
     summary_sheet_workbook = load_workbook(summary_sheet_path_str)
+    if summary_sheet_label_str not in summary_sheet_workbook.sheetnames:
+        show_message("错误", f"汇总表工作表名 {summary_sheet_label_str} 不存在, 请检查!")
+        return
+    
+    raw_sheet_workbook = load_workbook(raw_sheet_path_str)
+    if raw_sheet_label_str not in raw_sheet_workbook.sheetnames:
+        show_message("错误", f"原始数据表工作表名 {raw_sheet_label_str} 不存在, 请检查!")
+        return
+
     summary_sheet = summary_sheet_workbook[summary_sheet_label_str]
+    raw_sheet = raw_sheet_workbook[raw_sheet_label_str]
 
     summary_item_number_dict = {}
     item_start_row = int(summary_sheet_item_start_row_str)
     item_name_col = convert_letter_to_number(summary_sheet_item_name_col_str) - 1
     item_spec_col = convert_letter_to_number(summary_sheet_item_spec_col_str) - 1
-
-    raw_sheet_workbook = load_workbook(raw_sheet_path_str)
-    raw_sheet = raw_sheet_workbook[raw_sheet_label_str]
 
     # 结果文件可写状态检测
     source_file_path = summary_sheet_path_var.get()
@@ -376,8 +383,7 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
                 summary_item_name in raw_item_name
                 and raw_item_spec in summary_item_spec
             ):
-                value = raw_value
-                break
+                value += raw_value
 
         print(f"{cur_row}: {key} {value}")
         csv_data.append([summary_item_name, summary_item_spec, value])

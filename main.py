@@ -259,12 +259,16 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
 
     summary_sheet_workbook = load_workbook(summary_sheet_path_str)
     if summary_sheet_label_str not in summary_sheet_workbook.sheetnames:
-        show_message("错误", f"汇总表工作表名 {summary_sheet_label_str} 不存在, 请检查!")
+        show_message(
+            "错误", f"汇总表工作表名 {summary_sheet_label_str} 不存在, 请检查!"
+        )
         return
-    
+
     raw_sheet_workbook = load_workbook(raw_sheet_path_str)
     if raw_sheet_label_str not in raw_sheet_workbook.sheetnames:
-        show_message("错误", f"原始数据表工作表名 {raw_sheet_label_str} 不存在, 请检查!")
+        show_message(
+            "错误", f"原始数据表工作表名 {raw_sheet_label_str} 不存在, 请检查!"
+        )
         return
 
     summary_sheet = summary_sheet_workbook[summary_sheet_label_str]
@@ -318,7 +322,19 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
         if item_name is None:
             break
         else:
+            index = item_name.find("*")
+            if index != -1:
+                item_name = item_name[:index]
+            item_name = item_name.replace("▲", "")
+            item_name = item_name.replace("◆", "")
+            item_name = item_name.replace("◆", "")
+            item_name = item_name.replace("●", "")
+            item_name = item_name.split("|")[0]
+            item_name = item_name.split(" ")[0]
+
             item_spec = col[item_spec_col].value
+            # print(item_name, item_spec)
+            item_spec = item_spec.replace("：", ":")
             item_tuple = (item_name, item_spec)
             if item_tuple not in summary_item_number_dict:
                 summary_item_number_dict[item_tuple] = 0
@@ -346,10 +362,18 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
             if "非中选" in item_name:
                 continue
 
+            item_name = item_name.replace("▲", "")
+            item_name = item_name.replace("◆", "")
+            item_name = item_name.replace("◆", "")
+            item_name = item_name.replace("●", "")
+            item_name = item_name.split("|")[0]
+            item_name = item_name.split(" ")[0]
+
             item_spec = col[item_spec_col].value
             index = item_spec.find("*")
             if index != -1:
                 item_spec = item_spec[:index]
+            # item_spec = item_spec.replace('：', ':')
 
             item_tuple = (item_name, item_spec)
             num = col[item_num_col].value
@@ -381,10 +405,10 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
             raw_item_spec = raw_key[1]
             if (
                 summary_item_name in raw_item_name
-                and raw_item_spec in summary_item_spec
+                # and raw_item_spec in summary_item_spec
             ):
                 value += raw_value
-
+        value = int(value)
         print(f"{cur_row}: {key} {value}")
         csv_data.append([summary_item_name, summary_item_spec, value])
 

@@ -11,7 +11,7 @@ cp -r C:/Users/chenyu/AppData/Local/Programs/Python/Python313/tcl .venv/
 
 
 todo:
-用药品编码来匹配
+用药品编码来匹配 - done
+支持xls - 取消, openpyxl 不支持
 记录上次参数
 支持文件拖拽
-支持xls

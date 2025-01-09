@@ -11,7 +11,7 @@ root = Tk()
 
 
 def open_openfilename_dialog(var):
-    ftypes = [("xlsx", ".xlsx")]
+    ftypes = [("Excel files", ".xlsx")]
     var1 = StringVar()
     openfilename = filedialog.askopenfilename(
         parent=root,
@@ -150,6 +150,16 @@ summary_sheet_item_spec_col_entry = Entry(
 summary_sheet_item_spec_col_entry.bind("<Key>", allow_only_letters)
 summary_sheet_item_spec_col_entry.grid(row=4, column=1, padx=5, pady=5)
 
+summary_sheet_code_col_label = Label(frame_summary, text="药品编码")
+summary_sheet_code_col_label.grid(row=5, column=0, padx=5, pady=5)
+summary_sheet_code_col_var = StringVar()
+summary_sheet_code_col_var.set("F")
+summary_sheet_code_col_entry = Entry(
+    frame_summary, textvariable=summary_sheet_code_col_var
+)
+summary_sheet_code_col_entry.bind("<Key>", allow_only_letters)
+summary_sheet_code_col_entry.grid(row=5, column=1, padx=5, pady=5)
+
 # 创建一个Frame作为分隔符
 separator = Frame(root, height=2, relief=SUNKEN)
 separator.pack(fill=X, padx=10, pady=10)  # 水平填充，并设置一些内边距
@@ -223,6 +233,15 @@ raw_sheet_item_num_col_entry = Entry(frame_raw, textvariable=raw_sheet_item_num_
 raw_sheet_item_num_col_entry.bind("<Key>", allow_only_letters)
 raw_sheet_item_num_col_entry.grid(row=5, column=1, padx=5, pady=5)
 
+raw_sheet_code_col_label = Label(frame_raw, text="药品编码")
+raw_sheet_code_col_label.grid(row=6, column=0, padx=5, pady=5)
+raw_sheet_code_col_var = StringVar()
+raw_sheet_code_col_var.set("F")
+raw_sheet_code_col_entry = Entry(
+    frame_raw, textvariable=raw_sheet_code_col_var
+)
+raw_sheet_code_col_entry.bind("<Key>", allow_only_letters)
+raw_sheet_code_col_entry.grid(row=6, column=1, padx=5, pady=5)
 
 def start_process(raw_sheet_path_var, summary_sheet_path_var):
     # 参数检测
@@ -231,6 +250,7 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
     summary_sheet_item_start_row_str = summary_sheet_item_start_row_var.get()
     summary_sheet_item_spec_col_str = summary_sheet_item_spec_col_var.get()
     summary_sheet_item_name_col_str = summary_sheet_item_name_col_var.get()
+    summary_sheet_code_col_str = summary_sheet_code_col_var.get()
 
     raw_sheet_path_str = raw_sheet_path_var.get()
     raw_sheet_label_str = raw_sheet_label_var.get()
@@ -238,6 +258,7 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
     raw_sheet_item_spec_col_str = raw_sheet_item_spec_col_var.get()
     raw_sheet_item_name_col_str = raw_sheet_item_name_col_var.get()
     raw_sheet_item_num_col_str = raw_sheet_item_num_col_var.get()
+    raw_sheet_code_col_str = raw_sheet_code_col_var.get()
 
     args = {
         "汇总表路径": summary_sheet_path_str,
@@ -278,6 +299,7 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
     item_start_row = int(summary_sheet_item_start_row_str)
     item_name_col = convert_letter_to_number(summary_sheet_item_name_col_str) - 1
     item_spec_col = convert_letter_to_number(summary_sheet_item_spec_col_str) - 1
+    code_col = convert_letter_to_number(summary_sheet_code_col_str) - 1
 
     # 结果文件可写状态检测
     source_file_path = summary_sheet_path_var.get()
@@ -332,10 +354,12 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
             item_name = item_name.split("|")[0]
             item_name = item_name.split(" ")[0]
 
-            item_spec = col[item_spec_col].value
+            # item_spec = col[item_spec_col].value
             # print(item_name, item_spec)
-            item_spec = item_spec.replace("：", ":")
-            item_tuple = (item_name, item_spec)
+            # item_spec = item_spec.replace("：", ":")
+
+            code = col[code_col].value
+            item_tuple = (item_name, code)
             if item_tuple not in summary_item_number_dict:
                 summary_item_number_dict[item_tuple] = 0
             else:
@@ -347,7 +371,9 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
     item_name_col = convert_letter_to_number(raw_sheet_item_name_col_str) - 1
     item_spec_col = convert_letter_to_number(raw_sheet_item_spec_col_str) - 1
     item_num_col = convert_letter_to_number(raw_sheet_item_num_col_str) - 1
-    print(item_name_col, item_spec_col, item_num_col)
+    code_col = convert_letter_to_number(raw_sheet_code_col_str) - 1
+    
+    # print(item_name_col, item_spec_col, item_num_col)
 
     cur_row = 0
     for col in raw_sheet:
@@ -369,18 +395,20 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
             item_name = item_name.split("|")[0]
             item_name = item_name.split(" ")[0]
 
-            item_spec = col[item_spec_col].value
-            index = item_spec.find("*")
-            if index != -1:
-                item_spec = item_spec[:index]
+            # item_spec = col[item_spec_col].value
+            # index = item_spec.find("*")
+            # if index != -1:
+            #     item_spec = item_spec[:index]
             # item_spec = item_spec.replace('：', ':')
 
-            item_tuple = (item_name, item_spec)
+            code = col[code_col].value
+
+            # item_tuple = (item_name, code)
             num = col[item_num_col].value
-            if item_tuple not in raw_item_number_dict:
-                raw_item_number_dict[item_tuple] = num
+            if code not in raw_item_number_dict:
+                raw_item_number_dict[code] = num
             else:
-                raw_item_number_dict[item_tuple] += num
+                raw_item_number_dict[code] += num
 
     print("统计表")
     cur_row = 0
@@ -398,19 +426,14 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
         cur_row += 1
         value = 0
         summary_item_name = key[0]
-        summary_item_spec = key[1]
+        code = key[1]
 
-        for raw_key, raw_value in raw_item_number_dict.items():
-            raw_item_name = raw_key[0]
-            raw_item_spec = raw_key[1]
-            if (
-                summary_item_name in raw_item_name
-                # and raw_item_spec in summary_item_spec
-            ):
+        for raw_code, raw_value in raw_item_number_dict.items():
+            if code == raw_code:
                 value += raw_value
         value = int(value)
         print(f"{cur_row}: {key} {value}")
-        csv_data.append([summary_item_name, summary_item_spec, value])
+        csv_data.append([summary_item_name, code, value])
 
     with open(generated_file_path, mode="w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)

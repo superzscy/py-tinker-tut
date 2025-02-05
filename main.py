@@ -153,7 +153,7 @@ summary_sheet_item_spec_col_entry.grid(row=4, column=1, padx=5, pady=5)
 summary_sheet_code_col_label = Label(frame_summary, text="药品编码")
 summary_sheet_code_col_label.grid(row=5, column=0, padx=5, pady=5)
 summary_sheet_code_col_var = StringVar()
-summary_sheet_code_col_var.set("F")
+summary_sheet_code_col_var.set("C")
 summary_sheet_code_col_entry = Entry(
     frame_summary, textvariable=summary_sheet_code_col_var
 )
@@ -236,10 +236,8 @@ raw_sheet_item_num_col_entry.grid(row=5, column=1, padx=5, pady=5)
 raw_sheet_code_col_label = Label(frame_raw, text="药品编码")
 raw_sheet_code_col_label.grid(row=6, column=0, padx=5, pady=5)
 raw_sheet_code_col_var = StringVar()
-raw_sheet_code_col_var.set("F")
-raw_sheet_code_col_entry = Entry(
-    frame_raw, textvariable=raw_sheet_code_col_var
-)
+raw_sheet_code_col_var.set("C")
+raw_sheet_code_col_entry = Entry(frame_raw, textvariable=raw_sheet_code_col_var)
 raw_sheet_code_col_entry.bind("<Key>", allow_only_letters)
 raw_sheet_code_col_entry.grid(row=6, column=1, padx=5, pady=5)
 
@@ -295,7 +293,7 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
     summary_sheet = summary_sheet_workbook[summary_sheet_label_str]
     raw_sheet = raw_sheet_workbook[raw_sheet_label_str]
 
-    summary_item_number_dict = {}
+    summary_item_codes_list = []
     item_start_row = int(summary_sheet_item_start_row_str)
     item_name_col = convert_letter_to_number(summary_sheet_item_name_col_str) - 1
     item_spec_col = convert_letter_to_number(summary_sheet_item_spec_col_str) - 1
@@ -344,26 +342,31 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
         if item_name is None:
             break
         else:
-            index = item_name.find("*")
-            if index != -1:
-                item_name = item_name[:index]
-            item_name = item_name.replace("▲", "")
-            item_name = item_name.replace("◆", "")
-            item_name = item_name.replace("◆", "")
-            item_name = item_name.replace("●", "")
-            item_name = item_name.split("|")[0]
-            item_name = item_name.split(" ")[0]
+            pass
+            # index = item_name.find("*")
+            # if index != -1:
+            #     item_name = item_name[:index]
+            # item_name = item_name.replace("▲", "")
+            # item_name = item_name.replace("◆", "")
+            # item_name = item_name.replace("◆", "")
+            # item_name = item_name.replace("●", "")
+            # item_name = item_name.split("|")[0]
+            # item_name = item_name.split(" ")[0]
 
             # item_spec = col[item_spec_col].value
             # print(item_name, item_spec)
             # item_spec = item_spec.replace("：", ":")
 
-            code = col[code_col].value
-            item_tuple = (item_name, code)
-            if item_tuple not in summary_item_number_dict:
-                summary_item_number_dict[item_tuple] = 0
+            codes = []
+            code_str = col[code_col].value
+            if "," in code_str:
+                codes = code_str.split(",")
+            elif "，" in code_str:
+                codes = code_str.split("，")
             else:
-                print(f"!! 汇总表里有重复的 !! {item_tuple}")
+                codes.append(code_str)
+
+            summary_item_codes_list.append((item_name, codes))
 
     # 原始数据表
     raw_item_number_dict = {}
@@ -372,7 +375,7 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
     item_spec_col = convert_letter_to_number(raw_sheet_item_spec_col_str) - 1
     item_num_col = convert_letter_to_number(raw_sheet_item_num_col_str) - 1
     code_col = convert_letter_to_number(raw_sheet_code_col_str) - 1
-    
+
     # print(item_name_col, item_spec_col, item_num_col)
 
     cur_row = 0
@@ -388,12 +391,12 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
             if "非中选" in item_name:
                 continue
 
-            item_name = item_name.replace("▲", "")
-            item_name = item_name.replace("◆", "")
-            item_name = item_name.replace("◆", "")
-            item_name = item_name.replace("●", "")
-            item_name = item_name.split("|")[0]
-            item_name = item_name.split(" ")[0]
+            # item_name = item_name.replace("▲", "")
+            # item_name = item_name.replace("◆", "")
+            # item_name = item_name.replace("◆", "")
+            # item_name = item_name.replace("●", "")
+            # item_name = item_name.split("|")[0]
+            # item_name = item_name.split(" ")[0]
 
             # item_spec = col[item_spec_col].value
             # index = item_spec.find("*")
@@ -419,21 +422,21 @@ def start_process(raw_sheet_path_var, summary_sheet_path_var):
 
     print("汇总表")
     csv_data = []
-    csv_data.append(["药品名", "规格", "使用量"])
+    csv_data.append(["药品名", "药品编码", "使用量"])
 
     cur_row = 0
-    for key, _ in summary_item_number_dict.items():
+    for item in summary_item_codes_list:
+        summary_item_name, summary_item_codes = item[0], item[1]
         cur_row += 1
         value = 0
-        summary_item_name = key[0]
-        code = key[1]
 
         for raw_code, raw_value in raw_item_number_dict.items():
-            if code == raw_code:
-                value += raw_value
+            for code in summary_item_codes:
+                if code == raw_code:
+                    value += raw_value
         value = int(value)
-        print(f"{cur_row}: {key} {value}")
-        csv_data.append([summary_item_name, code, value])
+        print(f"{cur_row}: {summary_item_name} {value}")
+        csv_data.append([summary_item_name, summary_item_codes, value])
 
     with open(generated_file_path, mode="w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
@@ -453,4 +456,11 @@ btn_process = Button(
 )
 btn_process.pack()
 
+
+def on_closing():
+    root.quit()
+    root.destroy()
+
+
+root.protocol("WM_DELETE_WINDOW", on_closing)
 root.mainloop()

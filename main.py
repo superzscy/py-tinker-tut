@@ -1,7 +1,8 @@
 from tkinter import *
 from tkinter.ttk import *
 from tkinter import filedialog, messagebox
-from openpyxl import load_workbook
+from openpyxl import load_workbook, Workbook
+import pandas as pd
 import os
 import errno
 import csv
@@ -231,10 +232,14 @@ class GUI:
 
     def create_file_selector(self, parent, button_text, path_var, row):
         """创建文件选择器组件"""
+        filetypes = [
+            ('Excel files', '*.xlsx;*.xls'),
+            ('All files', '*.*')
+        ]
         btn = Button(
             parent,
             text=button_text,
-            command=lambda: self.open_file_dialog(path_var),
+            command=lambda: self.open_file_dialog(path_var, filetypes),
             padding=DEFAULT_PADDING
         )
         btn.grid(row=row, column=0, padx=5, pady=5)
@@ -273,15 +278,16 @@ class GUI:
         )
         btn_process.pack(pady=20)
 
-    def open_file_dialog(self, var):
+    def open_file_dialog(self, var, filetypes):
         """打开文件选择对话框"""
-        ftypes = [("Excel files", ".xlsx")]
         filename = filedialog.askopenfilename(
             parent=self.root,
-            filetypes=ftypes,
+            filetypes=filetypes,
             title="选择Excel文件"
         )
-        var.set(filename)
+        if filename:
+            var.set(filename)
+            self.save_current_config()
 
     def setup_window_close(self):
         """设置窗口关闭处理"""
@@ -289,167 +295,90 @@ class GUI:
 
     def start_process(self):
         """开始处理数据"""
-        # 保存当前配置
-        self.save_current_config()
-        
-        summary_sheet_path_str = self.summary_sheet_path_var.get()
-        summary_sheet_label_str = self.summary_sheet_label_var.get()
-        summary_sheet_start_row_str = self.summary_sheet_start_row_var.get()
-        summary_sheet_name_col_str = self.summary_sheet_name_col_var.get()
-        summary_sheet_spec_col_str = self.summary_sheet_spec_col_var.get()
-        summary_sheet_code_col_str = self.summary_sheet_code_col_var.get()
-
-        raw_sheet_path_str = self.raw_sheet_path_var.get()
-        raw_sheet_label_str = self.raw_sheet_label_var.get()
-        raw_sheet_start_row_str = self.raw_sheet_start_row_var.get()
-        raw_sheet_num_col_str = self.raw_sheet_num_col_var.get()  # 使用正确的列号变量
-
-        args = {
-            "汇总表路径": summary_sheet_path_str,
-            "汇总表工作表名": summary_sheet_label_str,
-            "汇总表数据开始行号": summary_sheet_start_row_str,
-            "汇总表药品名列号": summary_sheet_name_col_str,
-            "汇总表规格列号": summary_sheet_spec_col_str,
-            "汇总表药品编码": summary_sheet_code_col_str,
-            "原始数据表路径": raw_sheet_path_str,
-            "原始数据表工作表名": raw_sheet_label_str,
-            "原始数据表数据开始行号": raw_sheet_start_row_str
-        }
-
-        for k, v in args.items():
-            if v == "":
-                show_message("错误", f"{k} 参数错误, 请检查!")
-                return
-
         try:
-            summary_sheet_workbook = load_workbook(summary_sheet_path_str)
-            if summary_sheet_label_str not in summary_sheet_workbook.sheetnames:
-                show_message(
-                    "错误", f"汇总表工作表名 {summary_sheet_label_str} 不存在, 请检查!"
-                )
+            summary_path = self.summary_sheet_path_var.get()
+            raw_path = self.raw_sheet_path_var.get()
+
+            if not summary_path or not raw_path:
+                messagebox.showerror("错误", "请选择汇总表和原始数据表文件")
                 return
 
-            raw_sheet_workbook = load_workbook(raw_sheet_path_str)
-            if raw_sheet_label_str not in raw_sheet_workbook.sheetnames:
-                show_message(
-                    "错误", f"原始数据表工作表名 {raw_sheet_label_str} 不存在, 请检查!"
-                )
-                return
-
-            summary_sheet = summary_sheet_workbook[summary_sheet_label_str]
-            raw_sheet = raw_sheet_workbook[raw_sheet_label_str]
-
+            # Read summary sheet using pandas
             summary_item_codes_list = []
-            item_start_row = int(summary_sheet_start_row_str)
-            item_name_col = ExcelProcessor.convert_letter_to_number(summary_sheet_name_col_str) - 1
-            item_spec_col = ExcelProcessor.convert_letter_to_number(summary_sheet_spec_col_str) - 1
-            code_col = ExcelProcessor.convert_letter_to_number(summary_sheet_code_col_str) - 1
+            try:
+                df_summary = pd.read_excel(
+                    summary_path, 
+                    sheet_name=self.summary_sheet_label_var.get(),
+                    header=None,
+                    skiprows=int(self.summary_sheet_start_row_var.get())-1
+                )
+                
+                name_col = ExcelProcessor.convert_letter_to_number(self.summary_sheet_name_col_var.get()) - 1
+                spec_col = ExcelProcessor.convert_letter_to_number(self.summary_sheet_spec_col_var.get()) - 1
+                code_col = ExcelProcessor.convert_letter_to_number(self.summary_sheet_code_col_var.get()) - 1
+                
+                for idx, row in df_summary.iterrows():
+                    code_str = str(row.iloc[code_col])
+                    # break if code is empty or contains only whitespace
+                    if not code_str or code_str.isspace():
+                        break
 
-            cur_row = 0
-            for col in summary_sheet:
-                cur_row += 1
-                if cur_row < item_start_row:
-                    continue
-
-                item_name = col[item_name_col].value
-                if item_name is None:
-                    break
-                else:
-                    codes = []
-                    code_str = str(col[code_col].value or '')  # 确保code_str是字符串类型
                     if "," in code_str:
                         codes = code_str.split(",")
                     elif "，" in code_str:
                         codes = code_str.split("，")
                     else:
-                        codes.append(code_str)
+                        codes = [code_str]
 
-                    summary_item_codes_list.append((item_name, codes))
-
-            raw_item_number_dict = {}
-            item_start_row = int(raw_sheet_start_row_str)
-            item_name_col = ExcelProcessor.convert_letter_to_number(summary_sheet_name_col_str) - 1
-            item_spec_col = ExcelProcessor.convert_letter_to_number(summary_sheet_spec_col_str) - 1
-            item_num_col = ExcelProcessor.convert_letter_to_number(raw_sheet_num_col_str) - 1
-            code_col = ExcelProcessor.convert_letter_to_number(summary_sheet_code_col_str) - 1
-
-            cur_row = 0
-            for col in raw_sheet:
-                cur_row += 1
-                if cur_row < item_start_row:
-                    continue
-
-                item_name = col[item_name_col].value
-                if item_name is None:
-                    break
-                else:
-                    if "非中选" in str(item_name):
-                        continue
-
-                    code = str(col[code_col].value or '')  # 确保code是字符串类型
-                    num_value = col[item_num_col].value
-                    try:
-                        num = float(str(num_value or '0').strip())  # 将数值转换为float类型
-                    except (ValueError, TypeError):
-                        show_message("错误", f"第 {cur_row} 行的使用量数据格式不正确: {num_value}")
-                        return
-
-                    if code not in raw_item_number_dict:
-                        raw_item_number_dict[code] = num
-                    else:
-                        raw_item_number_dict[code] += num
-
-            csv_data = []
-            csv_data.append(["药品名", "药品编码", "使用量"])
-
-            cur_row = 0
-            for item in summary_item_codes_list:
-                summary_item_name, summary_item_codes = item[0], item[1]
-                cur_row += 1
-                value = 0.0  # 使用浮点数来存储总和
-
-                for raw_code, raw_value in raw_item_number_dict.items():
-                    for code in summary_item_codes:
-                        if code.strip() == raw_code.strip():  # 去除可能的空白字符再比较
-                            value += raw_value
-
-                csv_data.append([summary_item_name, summary_item_codes, int(value)])  # 最终结果取整
-
-            source_file_path = summary_sheet_path_str
-            source_file_name_with_ext = os.path.basename(source_file_path)
-            source_file_name_without_ext, _ = os.path.splitext(source_file_name_with_ext)
-            generated_file_path = os.path.join(
-                os.path.dirname(source_file_path),
-                source_file_name_without_ext + "_generated.csv",
-            )
-
-            try:
-                with open(generated_file_path, mode="w", newline="", encoding="utf-8") as file:
-                    writer = csv.writer(file)
-                    writer.writerows(csv_data)
-            except OSError as e:
-                if e.errno == errno.EACCES:
-                    show_message(
-                        "错误",
-                        f"汇总结果文件 [{generated_file_path}] 无法被写入。可能是文件正在被另一个程序使用。请先关闭.",
-                    )
-                else:
-                    show_message(
-                        "错误",
-                        f"汇总结果文件 [{generated_file_path}] 无法被写入。错误：{e}, 错误码:{e.errno}",
-                    )
+                    summary_item_codes_list.append({
+                        # split the code string by comma, strip each code, and only keep non-empty codes
+                        'codes': codes,
+                        'name': ' '.join(str(row.iloc[name_col]).strip().splitlines()),
+                        'spec': str(row.iloc[spec_col]).strip(),
+                        'line_number': idx + int(self.summary_sheet_start_row_var.get()),
+                        'item_number': 0,
+                        })
             except Exception as e:
-                show_message(
-                    "错误",
-                    f"汇总结果文件 [{generated_file_path}] 无法被写入。发生了一个意外错误：{e}",
-                )
+                messagebox.showerror("错误", f"读取汇总表时出错：{str(e)}")
+                return
 
-            show_message(
-                "",
-                f"汇总结果已写入到 [{generated_file_path}], 请用Excel打开查看结果",
-            )
+            # Read and update raw sheet
+            try:
+                df_raw = pd.read_excel(
+                    raw_path,
+                    sheet_name=self.raw_sheet_label_var.get(),
+                    header=None,
+                    skiprows=int(self.raw_sheet_start_row_var.get())-1
+                )
+                
+                name_col = ExcelProcessor.convert_letter_to_number(self.raw_sheet_name_col_var.get()) - 1
+                spec_col = ExcelProcessor.convert_letter_to_number(self.raw_sheet_spec_col_var.get()) - 1
+                code_col = ExcelProcessor.convert_letter_to_number(self.raw_sheet_code_col_var.get()) - 1
+                item_num_col = ExcelProcessor.convert_letter_to_number(self.raw_sheet_num_col_var.get()) - 1
+
+                # Process the data
+                for index, row in df_raw.iterrows():
+                    code = str(row.iloc[code_col])
+                    # break if code is empty or contains only whitespace
+                    if not code or code.isspace():
+                        break
+                    item_num = int(row.iloc[item_num_col])
+                    # find item in summary_item_codes_list by code, update its item_number with item_num_col
+                    item = next((item for item in summary_item_codes_list if code in item['codes']), None)
+                    if item is not None:
+                        item['item_number'] += item_num
+
+                print("All summary data:")
+                for item in summary_item_codes_list:
+                    print(f"Line: {item['line_number']}, Code: {item['codes']}, Name: {item['name']}, Spec: {item['spec']} , Item Number: {item['item_number']}")
+
+                messagebox.showinfo("成功", f"处理完成！")
+            except Exception as e:
+                messagebox.showerror("错误", f"处理原始数据表时出错：{str(e)}")
+                return
+
         except Exception as e:
-            show_message("错误", f"处理过程中发生错误: {str(e)}")
+            messagebox.showerror("错误", f"处理过程中出现错误：{str(e)}")
 
     def on_closing(self):
         """窗口关闭处理"""

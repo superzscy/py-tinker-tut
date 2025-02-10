@@ -9,6 +9,7 @@ readme = "README.md"
 python = ">=3.11,<3.14"
 openpyxl = "^3.1.5"
 pyinstaller = "^6.11.1"
+pandas = "^2.2.3"
 
 [build-system]
 requires = ["poetry-core"]

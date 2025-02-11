@@ -338,6 +338,17 @@ files = [
 ]
 
 [[package]]
+name = "tkinterdnd2"
+version = "0.4.2"
+description = "TkinterDnD2 is a python wrapper for George Petasis'' tkDnD Tk extension version 2"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "tkinterdnd2-0.4.2-py3-none-any.whl", hash = "sha256:73eb0a2e380f49687c1ac3b499014b09b53febc7f93d7ab4fefa4ede9691ab57"},
+    {file = "tkinterdnd2-0.4.2.tar.gz", hash = "sha256:00180ac38d86578441dea4662026c7867a022e14501ad492f81e22e22135ceb6"},
+]
+
+[[package]]
 name = "tzdata"
 version = "2025.1"
 description = "Provider of IANA time zone data"
@@ -351,4 +362,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.14"
-content-hash = "4ff4f0d71507bc6f86074d55ee0f7a14c25b433222516d3ca96321053bd3e130"
+content-hash = "9b181993c9691a60fd32b381306800058ba21d09077029a39c305b8c73b16a57"

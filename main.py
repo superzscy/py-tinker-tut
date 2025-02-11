@@ -1,6 +1,8 @@
 from tkinter import *
 from tkinter.ttk import *
 from tkinter import filedialog, messagebox
+from tkinter.font import Font
+from tkinterdnd2 import DND_FILES, TkinterDnD
 from openpyxl import load_workbook, Workbook
 import pandas as pd
 import os
@@ -21,7 +23,6 @@ DEFAULT_CONFIG = {
         "sheet_name": "集采第九批内部统计使用",
         "start_row": "4",
         "name_column": "D",
-        "spec_column": "F",
         "code_column": "C",
         "path": ""  # 添加路径配置
     },
@@ -29,7 +30,6 @@ DEFAULT_CONFIG = {
         "sheet_name": "Sheet1",
         "start_row": "5",
         "name_column": "D",
-        "spec_column": "E",
         "num_column": "F",
         "code_column": "C",
         "path": ""  # 添加路径配置
@@ -103,8 +103,15 @@ class GUI:
     """图形界面类，处理所有UI相关操作"""
     
     def __init__(self):
-        self.root = Tk()
-        self.root.title("Excel数据汇总工具")  # 添加窗口标题
+        self.root = TkinterDnD.Tk()  # 使用TkinterDnD的Tk
+        self.root.title("Excel数据汇总工具")
+        
+        # 设置窗口大小并禁用缩放
+        window_width = 400
+        window_height = 700
+        self.root.geometry(f"{window_width}x{window_height}")
+        self.root.resizable(False, False)  # 禁用窗口缩放
+        
         self.config = ConfigManager.load_config()  # 加载配置
         self.summary_sheet_path_var = StringVar()
         self.raw_sheet_path_var = StringVar()
@@ -122,13 +129,11 @@ class GUI:
         self.summary_sheet_label_var = StringVar(value=self.config["summary_sheet"]["sheet_name"])
         self.summary_sheet_start_row_var = StringVar(value=self.config["summary_sheet"]["start_row"])
         self.summary_sheet_name_col_var = StringVar(value=self.config["summary_sheet"]["name_column"])
-        self.summary_sheet_spec_col_var = StringVar(value=self.config["summary_sheet"]["spec_column"])
         self.summary_sheet_code_col_var = StringVar(value=self.config["summary_sheet"]["code_column"])
         
         self.raw_sheet_label_var = StringVar(value=self.config["raw_sheet"]["sheet_name"])
         self.raw_sheet_start_row_var = StringVar(value=self.config["raw_sheet"]["start_row"])
         self.raw_sheet_name_col_var = StringVar(value=self.config["raw_sheet"]["name_column"])
-        self.raw_sheet_spec_col_var = StringVar(value=self.config["raw_sheet"]["spec_column"])
         self.raw_sheet_num_col_var = StringVar(value=self.config["raw_sheet"]["num_column"])
         self.raw_sheet_code_col_var = StringVar(value=self.config["raw_sheet"]["code_column"])
 
@@ -148,14 +153,12 @@ class GUI:
         self.summary_sheet_label_var.trace_add("write", save_config)
         self.summary_sheet_start_row_var.trace_add("write", save_config)
         self.summary_sheet_name_col_var.trace_add("write", save_config)
-        self.summary_sheet_spec_col_var.trace_add("write", save_config)
         self.summary_sheet_code_col_var.trace_add("write", save_config)
 
         # 跟踪原始数据表配置变化
         self.raw_sheet_label_var.trace_add("write", save_config)
         self.raw_sheet_start_row_var.trace_add("write", save_config)
         self.raw_sheet_name_col_var.trace_add("write", save_config)
-        self.raw_sheet_spec_col_var.trace_add("write", save_config)
         self.raw_sheet_num_col_var.trace_add("write", save_config)
         self.raw_sheet_code_col_var.trace_add("write", save_config)
 
@@ -166,7 +169,6 @@ class GUI:
                 "sheet_name": self.summary_sheet_label_var.get(),
                 "start_row": self.summary_sheet_start_row_var.get(),
                 "name_column": self.summary_sheet_name_col_var.get(),
-                "spec_column": self.summary_sheet_spec_col_var.get(),
                 "code_column": self.summary_sheet_code_col_var.get(),
                 "path": self.summary_sheet_path_var.get()  # 保存路径
             },
@@ -174,7 +176,6 @@ class GUI:
                 "sheet_name": self.raw_sheet_label_var.get(),
                 "start_row": self.raw_sheet_start_row_var.get(),
                 "name_column": self.raw_sheet_name_col_var.get(),
-                "spec_column": self.raw_sheet_spec_col_var.get(),
                 "num_column": self.raw_sheet_num_col_var.get(),
                 "code_column": self.raw_sheet_code_col_var.get(),
                 "path": self.raw_sheet_path_var.get()  # 保存路径
@@ -184,51 +185,79 @@ class GUI:
 
     def create_gui(self):
         """创建图形界面"""
-        self.create_summary_frame()
-        self.create_separator()
-        self.create_raw_frame()
-        self.create_process_button()
+        # 创建主容器，使用网格布局
+        main_container = Frame(self.root, padding=10)
+        main_container.pack(fill=BOTH, expand=True)
 
-    def create_summary_frame(self):
+        # 为ttk组件创建样式
+        style = Style()
+        style.configure('Large.TLabelframe.Label', font=('Arial', 20))  # 设置LabelFrame标题字体
+        style.configure('Large.TButton', font=('Arial', 16))  # 设置按钮字体
+        style.configure('Accent.TButton', font=('Arial', 24, 'bold'))  # 设置强调按钮字体
+
+        # 创建汇总表框架
+        summary_frame = LabelFrame(
+            main_container, 
+            text="汇总表配置", 
+            padding=(5, 5),
+            style='Large.TLabelframe'  # 使用自定义样式
+        )
+        summary_frame.pack(fill=X, pady=(0, 10))
+        self.create_summary_frame(summary_frame)
+
+        # 创建原始表框架
+        raw_frame = LabelFrame(
+            main_container, 
+            text="原始表配置", 
+            padding=(5, 5),
+            style='Large.TLabelframe'  # 使用自定义样式
+        )
+        raw_frame.pack(fill=X, pady=(0, 10))
+        self.create_raw_frame(raw_frame)
+
+        # 创建处理按钮
+        self.create_process_button(main_container)
+
+    def create_summary_frame(self, parent):
         """创建汇总表框架"""
-        frame = Frame(self.root)
-        frame.pack(fill=BOTH, expand=True)
-
         # 创建选择汇总表按钮和标签
-        self.create_file_selector(frame, "选择汇总表", self.summary_sheet_path_var, 0)
+        file_frame = Frame(parent)
+        file_frame.pack(fill=X, pady=2)
+        self.create_file_selector(file_frame, "选择汇总表", self.summary_sheet_path_var, 0)
         
         # 创建输入字段
         fields = [
             ("工作表名", self.summary_sheet_label_var, None),
             ("数据开始行号", self.summary_sheet_start_row_var, InputValidator.allow_only_numbers),
             ("药品名列号", self.summary_sheet_name_col_var, InputValidator.allow_only_letters),
-            ("规格列号", self.summary_sheet_spec_col_var, InputValidator.allow_only_letters),
             ("药品编码", self.summary_sheet_code_col_var, InputValidator.allow_only_letters)
         ]
         
-        for i, (label_text, var, validator) in enumerate(fields, 1):
-            self.create_input_field(frame, label_text, var, validator, i)
+        for label_text, var, validator in fields:
+            field_frame = Frame(parent)
+            field_frame.pack(fill=X, pady=2)
+            self.create_input_field(field_frame, label_text, var, validator, 0)
 
-    def create_raw_frame(self):
+    def create_raw_frame(self, parent):
         """创建原始数据表框架"""
-        frame = Frame(self.root)
-        frame.pack(fill=BOTH, expand=True)
-
         # 创建选择原始数据表按钮和标签
-        self.create_file_selector(frame, "选择原始数据表", self.raw_sheet_path_var, 0)
+        file_frame = Frame(parent)
+        file_frame.pack(fill=X, pady=2)
+        self.create_file_selector(file_frame, "选择原始表", self.raw_sheet_path_var, 0)
         
         # 创建输入字段
         fields = [
             ("工作表名", self.raw_sheet_label_var, None),
             ("数据开始行号", self.raw_sheet_start_row_var, InputValidator.allow_only_numbers),
             ("药品名列号", self.raw_sheet_name_col_var, InputValidator.allow_only_letters),
-            ("规格列号", self.raw_sheet_spec_col_var, InputValidator.allow_only_letters),
             ("使用量列号", self.raw_sheet_num_col_var, InputValidator.allow_only_letters),
             ("药品编码", self.raw_sheet_code_col_var, InputValidator.allow_only_letters)
         ]
         
-        for i, (label_text, var, validator) in enumerate(fields, 1):
-            self.create_input_field(frame, label_text, var, validator, i)
+        for label_text, var, validator in fields:
+            field_frame = Frame(parent)
+            field_frame.pack(fill=X, pady=2)
+            self.create_input_field(field_frame, label_text, var, validator, 0)
 
     def create_file_selector(self, parent, button_text, path_var, row):
         """创建文件选择器组件"""
@@ -236,47 +265,162 @@ class GUI:
             ('Excel files', '*.xlsx;*.xls'),
             ('All files', '*.*')
         ]
+        
+        # 创建按钮，设置合适的宽度
         btn = Button(
             parent,
             text=button_text,
             command=lambda: self.open_file_dialog(path_var, filetypes),
-            padding=DEFAULT_PADDING
+            padding=(5, 2),
+            width=12,
+            style='Large.TButton'  # 使用自定义样式
         )
-        btn.grid(row=row, column=0, padx=5, pady=5)
+        btn.pack(side=LEFT, padx=(0, 5))
+
+        # 创建标签框架
+        label_frame = Frame(parent)
+        label_frame.pack(side=LEFT, fill=X, expand=True)
+        
+        # 创建用于显示截断路径的变量
+        truncated_path_var = StringVar()
+        truncated_path_var.set("未选择文件")
+        
+        # 创建字体变量
+        font_size = 24  # 默认字体大小加倍
+        label_font = Font(family="Arial", size=font_size, weight="bold")
+        
+        def adjust_font_size(text):
+            nonlocal font_size, label_font
+            # 根据文本长度调整字体大小
+            if len(text) <= 10:
+                new_size = 24  # 加倍
+            elif len(text) <= 15:
+                new_size = 20  # 加倍
+            elif len(text) <= 20:
+                new_size = 18  # 加倍
+            else:
+                new_size = 16  # 加倍
+                
+            if new_size != font_size:
+                font_size = new_size
+                label_font.configure(size=font_size)
+
+        def update_truncated_path(*args):
+            full_path = path_var.get()
+            if not full_path:
+                truncated_path_var.set("未选择文件")
+                adjust_font_size("未选择文件")
+                return
+                
+            filename = os.path.basename(full_path)
+            truncated_path_var.set(filename)
+            adjust_font_size(filename)
+        
+        path_var.trace_add("write", update_truncated_path)
+        update_truncated_path()
 
         label = Label(
-            parent,
-            textvariable=path_var,
-            padding=(50, 10),
-            font=DEFAULT_FONT,
-            background=DEFAULT_BG_COLOR
+            label_frame,
+            textvariable=truncated_path_var,
+            padding=(5, 2),
+            font=label_font,
+            background=DEFAULT_BG_COLOR,
+            anchor='w'
         )
-        label.grid(row=row, column=1, padx=5, pady=5)
+        label.pack(fill=X, expand=True)
+        
+        # 创建工具提示
+        def show_tooltip(event):
+            if not path_var.get():
+                return None
+                
+            tooltip = Toplevel(parent)
+            tooltip.wm_overrideredirect(True)
+            tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
+            
+            tip_label = Label(
+                tooltip,
+                text=path_var.get(),
+                justify=LEFT,
+                background="#ffffe0",
+                relief=SOLID,
+                borderwidth=1,
+                font=("Arial", 20)  # tooltip字体加大
+            )
+            tip_label.pack()
+            
+            return tooltip
+            
+        def on_enter(event):
+            if path_var.get():
+                widget = event.widget
+                widget.tooltip = show_tooltip(event)
+                
+        def on_leave(event):
+            widget = event.widget
+            if hasattr(widget, "tooltip"):
+                widget.tooltip.destroy()
+                del widget.tooltip
+        
+        label.bind('<Enter>', on_enter)
+        label.bind('<Leave>', on_leave)
+        
+        # 添加文件拖拽支持
+        label.drop_target_register(DND_FILES)
+        label.dnd_bind('<<Drop>>', lambda e: self.handle_drop(e, path_var))
 
     def create_input_field(self, parent, label_text, var, validator, row):
         """创建输入字段组件"""
-        label = Label(parent, text=label_text)
-        label.grid(row=row, column=0, padx=5, pady=5)
-
-        entry = Entry(parent, textvariable=var)
-        if validator:
-            entry.bind("<Key>", validator)
-        entry.grid(row=row, column=1, padx=5, pady=5)
-
-    def create_separator(self):
-        """创建分隔符"""
-        separator = Frame(self.root, height=2, relief=SUNKEN)
-        separator.pack(fill=X, padx=10, pady=10)
-
-    def create_process_button(self):
-        """创建处理按钮"""
-        btn_process = Button(
-            self.root,
-            text="开始汇总",
-            command=self.start_process,
-            padding=DEFAULT_PADDING
+        # 创建标签
+        label = Label(
+            parent,
+            text=label_text,
+            padding=(5, 2),
+            width=10,
+            font=("Arial", 16)  # 标签字体加大
         )
-        btn_process.pack(pady=20)
+        label.pack(side=LEFT, padx=(0, 5))
+
+        # 创建输入框
+        entry = Entry(
+            parent,
+            textvariable=var,
+            width=10,
+            font=("Arial", 20)  # 输入框字体加大
+        )
+        entry.pack(side=LEFT, fill=X, expand=True)
+        
+        if validator:
+            entry.bind('<KeyPress>', validator)
+
+    def create_process_button(self, parent):
+        """创建处理按钮"""
+        btn = Button(
+            parent,
+            text="开始处理",
+            command=self.start_process,
+            padding=(10, 5),
+            style='Accent.TButton'  # 使用强调样式
+        )
+        btn.pack(pady=10)
+
+    def handle_drop(self, event, path_var):
+        """处理文件拖放"""
+        files = event.data
+        if files and files.startswith('{'):
+            files = files[1:-1]  # 移除花括号
+        
+        if not os.path.isfile(files):
+            show_message("错误", "请拖拽一个有效的文件")
+            return
+            
+        # 检查文件扩展名
+        _, ext = os.path.splitext(files)
+        if ext.lower() not in ['.xlsx', '.xls']:
+            show_message("错误", "请拖拽Excel文件 (.xlsx 或 .xls)")
+            return
+            
+        path_var.set(files)
 
     def open_file_dialog(self, var, filetypes):
         """打开文件选择对话框"""
@@ -314,13 +458,12 @@ class GUI:
                 )
                 
                 name_col = ExcelProcessor.convert_letter_to_number(self.summary_sheet_name_col_var.get()) - 1
-                spec_col = ExcelProcessor.convert_letter_to_number(self.summary_sheet_spec_col_var.get()) - 1
                 code_col = ExcelProcessor.convert_letter_to_number(self.summary_sheet_code_col_var.get()) - 1
                 
                 for idx, row in df_summary.iterrows():
                     code_str = str(row.iloc[code_col])
-                    # break if code is empty or contains only whitespace
-                    if not code_str or code_str.isspace():
+                    # break if code_str is empty or contains only whitespace
+                    if not code_str or code_str.isspace() or code_str == "nan":
                         break
 
                     if "," in code_str:
@@ -334,7 +477,6 @@ class GUI:
                         # split the code string by comma, strip each code, and only keep non-empty codes
                         'codes': codes,
                         'name': ' '.join(str(row.iloc[name_col]).strip().splitlines()),
-                        'spec': str(row.iloc[spec_col]).strip(),
                         'line_number': idx + int(self.summary_sheet_start_row_var.get()),
                         'item_number': 0,
                         })
@@ -352,25 +494,24 @@ class GUI:
                 )
                 
                 name_col = ExcelProcessor.convert_letter_to_number(self.raw_sheet_name_col_var.get()) - 1
-                spec_col = ExcelProcessor.convert_letter_to_number(self.raw_sheet_spec_col_var.get()) - 1
                 code_col = ExcelProcessor.convert_letter_to_number(self.raw_sheet_code_col_var.get()) - 1
                 item_num_col = ExcelProcessor.convert_letter_to_number(self.raw_sheet_num_col_var.get()) - 1
 
                 # Process the data
                 for index, row in df_raw.iterrows():
-                    code = str(row.iloc[code_col])
-                    # break if code is empty or contains only whitespace
-                    if not code or code.isspace():
+                    code_str = str(row.iloc[code_col])
+                    # break if code_str is empty or contains only whitespace
+                    if not code_str or code_str.isspace() or code_str == "nan":
                         break
                     item_num = int(row.iloc[item_num_col])
                     # find item in summary_item_codes_list by code, update its item_number with item_num_col
-                    item = next((item for item in summary_item_codes_list if code in item['codes']), None)
+                    item = next((item for item in summary_item_codes_list if code_str in item['codes']), None)
                     if item is not None:
                         item['item_number'] += item_num
 
                 print("All summary data:")
                 for item in summary_item_codes_list:
-                    print(f"Line: {item['line_number']}, Code: {item['codes']}, Name: {item['name']}, Spec: {item['spec']} , Item Number: {item['item_number']}")
+                    print(f"Line: {item['line_number']}, Code: {item['codes']}, Name: {item['name']}, Item Number: {item['item_number']}")
 
                 messagebox.showinfo("成功", f"处理完成！")
             except Exception as e:

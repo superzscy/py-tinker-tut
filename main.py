@@ -14,6 +14,9 @@ DEFAULT_FONT = "Arial 14 bold"
 DEFAULT_BG_COLOR = "yellow"
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
 
+# 预定义的工作表名称
+SHEET_NAMES = ["集采第九批内部统计使用", "Sheet1", "Sheet2", "Sheet3", "数据汇总"]
+
 # 默认值配置
 DEFAULT_CONFIG = {
     "summary_sheet": {
@@ -43,6 +46,18 @@ class ExcelProcessor:
         if not letter.isalpha():
             return None
         return ord(letter.upper()) - ord("A") + 1
+
+    @staticmethod
+    def get_sheet_names(file_path):
+        """获取Excel文件中的所有工作表名称"""
+        try:
+            if not file_path:
+                return []
+            xl = pd.ExcelFile(file_path)
+            return xl.sheet_names
+        except Exception as e:
+            print(f"读取工作表名称失败: {str(e)}")
+            return []
 
 
 class InputValidator:
@@ -116,9 +131,23 @@ class GUI:
         self.config = ConfigManager.load_config()  # 加载配置
         self.summary_sheet_path_var = StringVar()
         self.raw_sheet_path_var = StringVar()
+
+        # 保存工作表名称下拉框的引用
+        self.summary_sheet_combobox = None
+        self.raw_sheet_combobox = None
+
         self.setup_variables()
         self.create_gui()
         self.setup_window_close()
+
+        # 设置文件路径变量的跟踪
+        self.summary_sheet_path_var.trace_add("write", self.update_summary_sheet_names)
+        self.raw_sheet_path_var.trace_add("write", self.update_raw_sheet_names)
+
+        if self.summary_sheet_path_var.get() is not None:
+            self.update_summary_sheet_names()
+        if self.raw_sheet_path_var.get() is not None:
+            self.update_raw_sheet_names()
 
     def setup_variables(self):
         """初始化所有GUI变量"""
@@ -274,7 +303,7 @@ class GUI:
         for label_text, var, validator in fields:
             field_frame = Frame(parent)
             field_frame.pack(fill=X, pady=2)
-            self.create_input_field(field_frame, label_text, var, validator, 0)
+            self.create_input_field(field_frame, label_text, var, validator, 0, True)
 
     def create_raw_frame(self, parent):
         """创建原始数据表框架"""
@@ -311,7 +340,7 @@ class GUI:
         for label_text, var, validator in fields:
             field_frame = Frame(parent)
             field_frame.pack(fill=X, pady=2)
-            self.create_input_field(field_frame, label_text, var, validator, 0)
+            self.create_input_field(field_frame, label_text, var, validator, 0, False)
 
     def create_file_selector(self, parent, button_text, path_var, row):
         """创建文件选择器组件"""
@@ -420,26 +449,39 @@ class GUI:
         label.drop_target_register(DND_FILES)
         label.dnd_bind("<<Drop>>", lambda e: self.handle_drop(e, path_var))
 
-    def create_input_field(self, parent, label_text, var, validator, row):
+    def create_input_field(self, parent, label_text, var, validator, row, is_summary):
         """创建输入字段组件"""
-        # 创建标签
+        # 创建标签，设置固定宽度
         label = Label(
-            parent,
-            text=label_text,
-            padding=(5, 2),
-            width=10,
-            font=("Arial", 16),  # 标签字体加大
-        )
-        label.pack(side=LEFT, padx=(0, 5))
+            parent, text=label_text, width=15, anchor="e"
+        )  # 设置固定宽度和右对齐
+        label.grid(row=row, column=0, padx=DEFAULT_PADDING, pady=5, sticky="e")
 
-        # 创建输入框
-        entry = Entry(
-            parent, textvariable=var, width=10, font=("Arial", 20)  # 输入框字体加大
-        )
-        entry.pack(side=LEFT, fill=X, expand=True)
+        if "工作表名" in str(label_text).lower():
+            # 对于工作表名称使用下拉菜单
+            input_widget = Combobox(
+                parent, textvariable=var, values=SHEET_NAMES, width=20
+            )  # 设置固定宽度
+            input_widget.set(var.get())
+            if is_summary:
+                self.summary_sheet_combobox = input_widget
+            else:
+                self.raw_sheet_combobox = input_widget
+        else:
+            # 其他字段使用普通输入框
+            input_widget = Entry(
+                parent, textvariable=var, validate="key", width=20
+            )  # 设置固定宽度
+            if validator:
+                input_widget["validatecommand"] = (
+                    input_widget.register(validator),
+                    "%P",
+                )
 
-        if validator:
-            entry.bind("<KeyPress>", validator)
+        input_widget.grid(
+            row=row, column=1, padx=DEFAULT_PADDING, pady=5, sticky="w"
+        )  # 改为左对齐
+        return input_widget
 
     def create_process_button(self, parent):
         """创建处理按钮"""
@@ -595,10 +637,32 @@ class GUI:
                 print("All summary data:")
                 for item in summary_item_codes_list:
                     print(
-                        f"Line: {item['line_number']}, Code: {item['codes']}, Name: {item['name']}, Item Number: {item['item_number']}"
+                        f"Line: {item['line_number']}, Code: {item['codes']}, Name: {item['name']}, Item Number: {int(item['item_number'])}"
                     )
 
-                messagebox.showinfo("成功", f"处理完成！")
+                csv_data = []
+                csv_data.append(["药品名", "药品编码", "使用量"])
+
+                for item in summary_item_codes_list:
+                    csv_data.append(
+                        [item["name"], item["codes"], int(item["item_number"])]
+                    )
+
+                source_file_path = summary_path
+                source_file_name_with_ext = os.path.basename(source_file_path)
+                source_file_name_without_ext, _ = os.path.splitext(
+                    source_file_name_with_ext
+                )
+                generated_file_path = os.path.join(
+                    os.path.dirname(source_file_path),
+                    source_file_name_without_ext + "_generated.csv",
+                )
+                df = pd.DataFrame(csv_data[1:], columns=csv_data[0])
+                df.to_csv(generated_file_path, index=False)
+
+                messagebox.showinfo(
+                    "成功", f"处理完成\n结果位于: {generated_file_path}"
+                )
             except Exception as e:
                 messagebox.showerror("错误", f"处理原始数据表时出错：{str(e)}")
                 return
@@ -615,6 +679,24 @@ class GUI:
     def run(self):
         """运行应用程序"""
         self.root.mainloop()
+
+    def update_summary_sheet_names(self, *args):
+        """更新汇总表工作表名称下拉菜单"""
+        if self.summary_sheet_combobox:
+            path = self.summary_sheet_path_var.get()
+            if path:
+                sheet_names = ExcelProcessor.get_sheet_names(path)
+                self.summary_sheet_combobox["values"] = sheet_names
+                self.summary_sheet_label_var.set(sheet_names[0] if sheet_names else "")
+
+    def update_raw_sheet_names(self, *args):
+        """更新原始表工作表名称下拉菜单"""
+        if self.raw_sheet_combobox:
+            path = self.raw_sheet_path_var.get()
+            if path:
+                sheet_names = ExcelProcessor.get_sheet_names(path)
+                self.raw_sheet_combobox["values"] = sheet_names
+                self.raw_sheet_label_var.set(sheet_names[0] if sheet_names else "")
 
 
 def show_message(title, message):

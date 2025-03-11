@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (QApplication, QComboBox, QFileDialog, QGridLayout,
                            QMainWindow, QPushButton, QVBoxLayout, QWidget,
                            QMessageBox)
 
-CONFIG_FILE = "config.json"
+CONFIG_FILE = "Excel数据汇总工具.json"
 
 class SheetConfig:
     def __init__(self, path: str = "", sheet_name: str = "", start_row: str = "4", name_column: str = "D", code_column: str = "C", num_column: str = ""):  
@@ -477,10 +477,13 @@ class MainWindow(QMainWindow):
             df_output = pd.DataFrame(csv_data[1:], columns=csv_data[0])
             df_output.to_csv(output_path, index=False)
 
+            # 将使用量的数据(数字部分, 不含第一行)拷贝到剪切板
+            QApplication.clipboard().setText(df_output["使用量"].to_csv(index=False, header=False))
+
             QMessageBox.information(
                 self,
                 "成功",
-                f"处理完成\n结果保存在：{output_path}"
+                f"处理完成\n结果保存在：{output_path}\n使用量数据已复制到剪切板, 可以直接粘贴进表格"
             )
 
         except Exception as e:

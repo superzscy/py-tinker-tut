@@ -252,6 +252,9 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(btn_layout)
         main_layout.addStretch()
 
+        # 保持窗口置顶
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+
     def select_summary_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
             self, "选择汇总表文件", "",
